@@ -34,6 +34,21 @@ class MovementSmoother:
 
         return smoothed_x, smoothed_y
 
+def calculate_palm_center(landmarks):
+    """Calculate the center of the palm using key landmarks"""
+    # Use wrist (0) and knuckle points (5,9,13,17) to find palm center
+    wrist = landmarks[0]
+    index_mcp = landmarks[5]
+    middle_mcp = landmarks[9]
+    ring_mcp = landmarks[13]
+    pinky_mcp = landmarks[17]
+    
+    # Calculate average position
+    x = (wrist[1] + index_mcp[1] + middle_mcp[1] + ring_mcp[1] + pinky_mcp[1]) / 5
+    y = (wrist[2] + index_mcp[2] + middle_mcp[2] + ring_mcp[2] + pinky_mcp[2]) / 5
+    
+    return int(x), int(y)
+
 def main():
     cap = cv2.VideoCapture(0)
     hand_tracker = HandTracker()
@@ -49,23 +64,18 @@ def main():
         landmarks = hand_tracker.find_position(img)
         
         if landmarks:
-            # Get both finger tips
-            index_finger_tip = landmarks[8]
-            middle_finger_tip = landmarks[12]
-            
-            # Calculate mean position
-            mean_x = (index_finger_tip[1] + middle_finger_tip[1]) / 2
-            mean_y = (index_finger_tip[2] + middle_finger_tip[2]) / 2
+            # Calculate palm center
+            palm_x, palm_y = calculate_palm_center(landmarks)
             
             # Normalize coordinates
-            x = mean_x / img.shape[1]
-            y = mean_y / img.shape[0]
+            x = palm_x / img.shape[1]
+            y = palm_y / img.shape[0]
             
             # Apply smoothing to the coordinates
             smoothed_x, smoothed_y = movement_smoother.smooth(x, y)
             
-            # Draw the control point on the image
-            #cv2.circle(img, (int(mean_x), int(mean_y)), 8, (0, 255, 0), cv2.FILLED)
+            # Draw the control point on the image (optional)
+            cv2.circle(img, (palm_x, palm_y), 8, (0, 0, 255), cv2.FILLED)
             
             # Recognize gestures
             gestures = gesture_recognizer.recognize_gesture(landmarks)
@@ -77,6 +87,8 @@ def main():
                 mouse_controller.click()
             if 'right_click' in gestures:
                 mouse_controller.right_click()
+            if 'terminate' in gestures:
+                break  # Exit the program when terminate gesture is detected
         
         cv2.imshow("Virtual Mouse", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
