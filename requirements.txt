@@ -1,0 +1,14 @@
+# Core Libraries
+opencv-python # For video capture and image processing
+mediapipe     # For hand tracking and gesture detection
+pyautogui     # For mouse control actions
+numpy         # For numerical operations
+
+# Optional Libraries (if you want to train custom models)
+tensorflow    # For creating and training neural networks
+torch          # Alternative to TensorFlow for deep learning
+scikit-learn   # For data processing and gesture classification
+
+# Utilities (optional but useful)
+matplotlib     # For visualizing data and debugging
+pandas         # For handling datasets if using custom training
