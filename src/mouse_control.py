@@ -1,4 +1,5 @@
 import pyautogui
+import time
 
 class MouseController:
     def __init__(self):
@@ -14,6 +15,7 @@ class MouseController:
 
     def click(self):
         pyautogui.click()
+        time.sleep(0.2)  # Add delay to prevent multiple clicks
 
     def double_click(self):
         """Perform a double click"""
@@ -21,19 +23,42 @@ class MouseController:
 
     def right_click(self):
         pyautogui.rightClick()
+        time.sleep(0.2)  # Add delay to prevent multiple clicks
 
     def zoom(self, distance):
+        """
+        Handle zoom based on thumb-pinky distance
+        Larger distance = zoom in
+        Smaller distance = zoom out
+        """
         if self.base_zoom_distance is None:
             self.base_zoom_distance = distance
             return
         
+        # Calculate zoom factor based on change in distance
         zoom_factor = (distance - self.base_zoom_distance) / self.base_zoom_distance
-        scroll_amount = int(zoom_factor * 10)
-        if scroll_amount != 0:
-            pyautogui.scroll(scroll_amount)
+        
+        # Convert to scroll units and apply zoom
+        scroll_amount = int(zoom_factor * 20)  # Increased multiplier for more noticeable zoom
+        
+        if abs(scroll_amount) > 0:  # Only zoom if there's significant change
+            # Make sure ctrl is pressed and released properly
+            pyautogui.keyDown('ctrl')
+            # Use larger scroll steps for more noticeable zoom
+            if scroll_amount > 0:
+                pyautogui.scroll(2)  # Zoom in
+            else:
+                pyautogui.scroll(-2)  # Zoom out
+            pyautogui.keyUp('ctrl')
+            
+            # Update base distance for next calculation
             self.base_zoom_distance = distance
+            
+            # Add small delay to prevent too rapid zooming
+            time.sleep(0.05)
     
     def reset_zoom(self):
+        """Reset zoom tracking"""
         self.base_zoom_distance = None
 
     def scroll(self, amount):

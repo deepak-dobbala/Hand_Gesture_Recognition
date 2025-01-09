@@ -105,23 +105,52 @@ def main():
             # Recognize gestures
             gestures = gesture_recognizer.recognize_gesture(landmarks)
             
-            # Handle gestures
-            if isinstance(gestures, list) and len(gestures) > 1 and gestures[0] == 'scroll':
-                mouse_controller.scroll(gestures[1])
-            else:
-                if 'drag' in gestures:
-                    mouse_controller.start_drag()
-                else:
-                    mouse_controller.end_drag()
+            # Draw visual feedback for gestures
+            if landmarks:
+                # Draw palm center
+                cv2.circle(img, (palm_x, palm_y), 8, (0, 0, 255), cv2.FILLED)
                 
-                if 'move' in gestures:
-                    mouse_controller.move(smoothed_x, smoothed_y)
-                if 'click' in gestures:
-                    mouse_controller.click()
-                if 'right_click' in gestures:
-                    mouse_controller.right_click()
-                if 'terminate' in gestures:
-                    break
+                # Draw click points
+                thumb_tip = (landmarks[4][1], landmarks[4][2])
+                index_pip = (landmarks[6][1], landmarks[6][2])
+                index_tip = (landmarks[8][1], landmarks[8][2])
+                middle_tip = (landmarks[12][1], landmarks[12][2])
+                
+                # Draw points for left click
+                cv2.circle(img, (int(thumb_tip[0]), int(thumb_tip[1])), 5, (255, 0, 0), -1)
+                cv2.circle(img, (int(index_pip[0]), int(index_pip[1])), 5, (255, 0, 0), -1)
+                
+                # Draw points for right click
+                cv2.circle(img, (int(index_tip[0]), int(index_tip[1])), 5, (0, 255, 0), -1)
+                cv2.circle(img, (int(middle_tip[0]), int(middle_tip[1])), 5, (0, 255, 0), -1)
+            
+            # Handle gestures
+            if isinstance(gestures, list) and len(gestures) > 1:
+                if gestures[0] == 'scroll':
+                    mouse_controller.scroll(gestures[1])
+                elif gestures[0] == 'zoom':
+                    zoom_distance = gestures[1]
+                    # Draw line between thumb and pinky for zoom
+                    if len(gestures) > 2:
+                        p1, p2 = gestures[2], gestures[3]
+                        cv2.line(img, (int(p1[0]), int(p1[1])), 
+                                (int(p2[0]), int(p2[1])), (0, 255, 255), 2)
+                    mouse_controller.zoom(zoom_distance)
+            
+            # Handle click gestures with priority
+            if 'click' in gestures:
+                mouse_controller.click()
+                # Add small delay to prevent multiple clicks
+                time.sleep(0.1)
+            elif 'right_click' in gestures:
+                mouse_controller.right_click()
+                # Add small delay to prevent multiple clicks
+                time.sleep(0.1)
+            elif 'move' in gestures:
+                mouse_controller.move(smoothed_x, smoothed_y)
+            
+            if 'terminate' in gestures:
+                break
         
         cv2.imshow("Virtual Mouse", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):

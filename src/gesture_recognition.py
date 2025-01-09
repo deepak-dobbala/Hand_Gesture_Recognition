@@ -8,11 +8,11 @@ class GestureRecognizer:
             'right_click': self.detect_right_click,
             'terminate': self.detect_terminate,
             'scroll': self.detect_scroll,
-            'drag': self.detect_drag
+            'zoom': self.detect_zoom
         }
         self.scroll_active = False
         self.scroll_direction = None
-        self.drag_active = False
+        self.prev_zoom_distance = None
 
     def are_main_fingers_open(self, landmarks):
         """Check if thumb, index, and middle fingers are open while others are closed"""
@@ -40,20 +40,26 @@ class GestureRecognizer:
         return thumb_open and index_open and middle_open and ring_closed and pinky_closed
 
     def detect_click(self, landmarks):
-        # Detect click when thumb tip gets close to index PIP (middle joint)
+        """Detect left click: thumb tip to index PIP (middle joint)"""
         thumb_tip = landmarks[4]
         index_pip = landmarks[6]  # Index finger PIP joint
         
+        # Calculate distance
         distance = math.sqrt((thumb_tip[1] - index_pip[1])**2 + (thumb_tip[2] - index_pip[2])**2)
-        return distance < 40  # Adjusted threshold for middle joint
+        
+        # Increase threshold slightly and add some buffer
+        return distance < 45  # Adjusted threshold for easier detection
 
     def detect_right_click(self, landmarks):
-        # Detect right click when index tip gets close to middle tip
+        """Detect right click: index tip to middle tip"""
         index_tip = landmarks[8]
         middle_tip = landmarks[12]
         
+        # Calculate distance
         distance = math.sqrt((middle_tip[1] - index_tip[1])**2 + (middle_tip[2] - index_tip[2])**2)
-        return distance < 40  # Reduced threshold for more precise detection
+        
+        # Increase threshold slightly
+        return distance < 45  # Adjusted threshold for easier detection
 
     def detect_terminate(self, landmarks):
         if not self.are_main_fingers_open(landmarks):
@@ -133,57 +139,74 @@ class GestureRecognizer:
         self.scroll_direction = None
         return False, 0
 
-    def detect_drag(self, landmarks):
+    def detect_zoom(self, landmarks):
         """
-        Detect drag gesture using palm closing:
-        - Calculate average distance between finger tips and palm center
-        - Small distance = closed palm (drag)
-        - Large distance = open palm (release)
+        Detect zoom gesture:
+        - Only thumb and pinky extended
+        - Other fingers closed
+        - Zoom based on distance between thumb and pinky tips
         """
-        # Get palm center using MCP (knuckle) points
-        palm_x = sum(landmarks[i][1] for i in [5,9,13,17]) / 4
-        palm_y = sum(landmarks[i][2] for i in [5,9,13,17]) / 4
+        # Get finger positions
+        thumb_tip = landmarks[4]
+        index_tip = landmarks[8]
+        middle_tip = landmarks[12]
+        ring_tip = landmarks[16]
+        pinky_tip = landmarks[20]
         
-        # Get fingertip positions
-        finger_tips = [landmarks[i] for i in [4,8,12,16,20]]  # thumb to pinky tips
+        # Get base positions
+        thumb_base = landmarks[2]
+        index_base = landmarks[5]
+        middle_base = landmarks[9]
+        ring_base = landmarks[13]
+        pinky_base = landmarks[17]
         
-        # Calculate average distance from palm center to fingertips
-        total_distance = 0
-        for tip in finger_tips:
-            distance = math.sqrt((tip[1] - palm_x)**2 + (tip[2] - palm_y)**2)
-            total_distance += distance
+        # Check if only thumb and pinky are extended
+        thumb_pinky_extended = (
+            thumb_tip[2] < thumb_base[2] and   # thumb extended
+            pinky_tip[2] < pinky_base[2]       # pinky extended
+        )
         
-        avg_distance = total_distance / 5
+        others_closed = (
+            index_tip[2] > index_base[2] and   # index closed
+            middle_tip[2] > middle_base[2] and  # middle closed
+            ring_tip[2] > ring_base[2]         # ring closed
+        )
         
-        # Determine if palm is closed or open
-        if avg_distance < 60:  # Palm closed
-            self.drag_active = True
-        elif avg_distance > 100:  # Palm open
-            self.drag_active = False
-        
-        return self.drag_active
+        if thumb_pinky_extended and others_closed:
+            # Calculate distance between thumb and pinky tips
+            distance = math.sqrt(
+                (thumb_tip[1] - pinky_tip[1])**2 + 
+                (thumb_tip[2] - pinky_tip[2])**2
+            )
+            
+            # Draw line between thumb and pinky for visual feedback
+            return True, distance, (thumb_tip[1], thumb_tip[2]), (pinky_tip[1], pinky_tip[2])
+            
+        self.prev_zoom_distance = None
+        return False, 0, None, None
 
     def recognize_gesture(self, landmarks):
         # First check for termination gesture
         if self.detect_terminate(landmarks):
             self.scroll_active = False
             self.scroll_direction = None
-            self.drag_active = False
+            self.prev_zoom_distance = None
             return ['terminate']
         
-        # Check for drag gesture (high priority)
-        if self.detect_drag(landmarks):
-            return ['drag']
+        # Check for zoom gesture
+        is_zooming, zoom_distance, thumb_tip, pinky_tip = self.detect_zoom(landmarks)
+        if is_zooming:
+            return ['zoom', zoom_distance, thumb_tip, pinky_tip]
         
         # Check for scroll gesture
         is_scrolling, scroll_amount = self.detect_scroll(landmarks)
         if is_scrolling:
             return ['scroll', scroll_amount]
         
-        # Only check for other gestures if not dragging or scrolling
+        # Only check for other gestures if not zooming or scrolling
         recognized_gestures = []
         for gesture, detect_func in self.gestures.items():
-            if gesture not in ['terminate', 'scroll', 'drag'] and detect_func(landmarks):
+            if gesture not in ['terminate', 'scroll', 'zoom'] and detect_func(landmarks):
                 recognized_gestures.append(gesture)
         
         return recognized_gestures
