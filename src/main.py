@@ -3,6 +3,7 @@ import numpy as np
 from hand_tracking import HandTracker
 from gesture_recognition import GestureRecognizer
 from mouse_control import MouseController
+import time
 
 class MovementSmoother:
     def __init__(self, smoothing_factor=0.5, stability_threshold=0.01):
@@ -50,45 +51,72 @@ def calculate_palm_center(landmarks):
     return int(x), int(y)
 
 def main():
+    # Initialize camera with optimized settings
     cap = cv2.VideoCapture(0)
-    hand_tracker = HandTracker()
+    
+    # Set camera properties for higher FPS
+    cap.set(cv2.CAP_PROP_FPS, 60)  # Request 60 FPS
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Reduce resolution width
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)  # Reduce resolution height
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # Use MJPG codec
+    
+    # Optional: Print actual FPS to verify settings
+    actual_fps = cap.get(cv2.CAP_PROP_FPS)
+    print(f"Camera FPS: {actual_fps}")
+    
+    hand_tracker = HandTracker(
+        static_image_mode=False,  # Set to False for better performance
+        max_num_hands=1,  # Limit to one hand for better performance
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
     gesture_recognizer = GestureRecognizer()
     mouse_controller = MouseController()
     movement_smoother = MovementSmoother(smoothing_factor=0.3, stability_threshold=0.005)
 
+    # FPS calculation variables
+    prev_time = 0
+    curr_time = 0
+    
     while True:
         success, img = cap.read()
-        img = cv2.flip(img, 1)  # Mirror the image
+        
+        # Calculate FPS
+        curr_time = time.time()
+        fps = 1 / (curr_time - prev_time)
+        prev_time = curr_time
+        
+        # Display FPS
+        cv2.putText(img, f'FPS: {int(fps)}', (10, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
+        img = cv2.flip(img, 1)
         
         img = hand_tracker.find_hands(img)
         landmarks = hand_tracker.find_position(img)
         
         if landmarks:
-            # Calculate palm center
             palm_x, palm_y = calculate_palm_center(landmarks)
-            
-            # Normalize coordinates
             x = palm_x / img.shape[1]
             y = palm_y / img.shape[0]
-            
-            # Apply smoothing to the coordinates
             smoothed_x, smoothed_y = movement_smoother.smooth(x, y)
-            
-            # Draw the control point on the image (optional)
             cv2.circle(img, (palm_x, palm_y), 8, (0, 0, 255), cv2.FILLED)
             
             # Recognize gestures
             gestures = gesture_recognizer.recognize_gesture(landmarks)
             
-            # Control the mouse
-            if 'move' in gestures:
-                mouse_controller.move(smoothed_x, smoothed_y)
-            if 'click' in gestures:
-                mouse_controller.click()
-            if 'right_click' in gestures:
-                mouse_controller.right_click()
-            if 'terminate' in gestures:
-                break  # Exit the program when terminate gesture is detected
+            # Handle gestures
+            if isinstance(gestures, list) and len(gestures) > 1 and gestures[0] == 'scroll':
+                mouse_controller.scroll(gestures[1])
+            else:
+                if 'move' in gestures:
+                    mouse_controller.move(smoothed_x, smoothed_y)
+                if 'click' in gestures:
+                    mouse_controller.click()
+                if 'right_click' in gestures:
+                    mouse_controller.right_click()
+                if 'terminate' in gestures:
+                    break
         
         cv2.imshow("Virtual Mouse", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
