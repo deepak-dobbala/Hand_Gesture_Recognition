@@ -109,6 +109,11 @@ def main():
             if isinstance(gestures, list) and len(gestures) > 1 and gestures[0] == 'scroll':
                 mouse_controller.scroll(gestures[1])
             else:
+                if 'drag' in gestures:
+                    mouse_controller.start_drag()
+                else:
+                    mouse_controller.end_drag()
+                
                 if 'move' in gestures:
                     mouse_controller.move(smoothed_x, smoothed_y)
                 if 'click' in gestures:

@@ -7,10 +7,12 @@ class GestureRecognizer:
             'move': self.detect_move,
             'right_click': self.detect_right_click,
             'terminate': self.detect_terminate,
-            'scroll': self.detect_scroll
+            'scroll': self.detect_scroll,
+            'drag': self.detect_drag
         }
         self.scroll_active = False
-        self.scroll_direction = None  # 'up' or 'down'
+        self.scroll_direction = None
+        self.drag_active = False
 
     def are_main_fingers_open(self, landmarks):
         """Check if thumb, index, and middle fingers are open while others are closed"""
@@ -131,22 +133,57 @@ class GestureRecognizer:
         self.scroll_direction = None
         return False, 0
 
+    def detect_drag(self, landmarks):
+        """
+        Detect drag gesture using palm closing:
+        - Calculate average distance between finger tips and palm center
+        - Small distance = closed palm (drag)
+        - Large distance = open palm (release)
+        """
+        # Get palm center using MCP (knuckle) points
+        palm_x = sum(landmarks[i][1] for i in [5,9,13,17]) / 4
+        palm_y = sum(landmarks[i][2] for i in [5,9,13,17]) / 4
+        
+        # Get fingertip positions
+        finger_tips = [landmarks[i] for i in [4,8,12,16,20]]  # thumb to pinky tips
+        
+        # Calculate average distance from palm center to fingertips
+        total_distance = 0
+        for tip in finger_tips:
+            distance = math.sqrt((tip[1] - palm_x)**2 + (tip[2] - palm_y)**2)
+            total_distance += distance
+        
+        avg_distance = total_distance / 5
+        
+        # Determine if palm is closed or open
+        if avg_distance < 60:  # Palm closed
+            self.drag_active = True
+        elif avg_distance > 100:  # Palm open
+            self.drag_active = False
+        
+        return self.drag_active
+
     def recognize_gesture(self, landmarks):
         # First check for termination gesture
         if self.detect_terminate(landmarks):
             self.scroll_active = False
             self.scroll_direction = None
+            self.drag_active = False
             return ['terminate']
+        
+        # Check for drag gesture (high priority)
+        if self.detect_drag(landmarks):
+            return ['drag']
         
         # Check for scroll gesture
         is_scrolling, scroll_amount = self.detect_scroll(landmarks)
         if is_scrolling:
             return ['scroll', scroll_amount]
         
-        # Only check for other gestures if not scrolling
+        # Only check for other gestures if not dragging or scrolling
         recognized_gestures = []
         for gesture, detect_func in self.gestures.items():
-            if gesture not in ['terminate', 'scroll'] and detect_func(landmarks):
+            if gesture not in ['terminate', 'scroll', 'drag'] and detect_func(landmarks):
                 recognized_gestures.append(gesture)
         
         return recognized_gestures

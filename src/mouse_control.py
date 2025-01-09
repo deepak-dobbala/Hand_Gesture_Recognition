@@ -16,6 +16,7 @@ class MouseController:
         pyautogui.click()
 
     def double_click(self):
+        """Perform a double click"""
         pyautogui.doubleClick()
 
     def right_click(self):
@@ -44,3 +45,23 @@ class MouseController:
         if abs(amount) > 0.5:  # Threshold to prevent tiny scrolls
             scroll_steps = int(amount * 5)  # Adjust multiplier for scroll sensitivity
             pyautogui.scroll(scroll_steps)
+
+    def minimize_window(self):
+        """Minimize the active window"""
+        pyautogui.hotkey('win', 'down')  # Windows shortcut to minimize
+
+    def start_selection(self):
+        """Start mass selection by holding down left mouse button"""
+        pyautogui.mouseDown()
+    
+    def end_selection(self):
+        """End mass selection by releasing left mouse button"""
+        pyautogui.mouseUp()
+
+    def start_drag(self):
+        """Start dragging by holding down left mouse button"""
+        pyautogui.mouseDown()
+    
+    def end_drag(self):
+        """End dragging by releasing left mouse button"""
+        pyautogui.mouseUp()
