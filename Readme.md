@@ -12,10 +12,10 @@ A computer vision-based system that allows users to control their mouse cursor u
 
 ## 🔧 Installation
 
-1. Clone the repository: bash
-git clone https://github.com/yourusername/virtual-mouse-control.git
+1. Clone the repository: bash : 
+git clone https://github.com/deepak-dobbala/Hand_Gesture_Recognition
 
-2. Install required packages:bash
+2. Install required packages:bash :
 pip install opencv-python mediapipe pyautogui numpy
 
 
